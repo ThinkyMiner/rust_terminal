@@ -1,3 +1,4 @@
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::process::Command;
 
@@ -16,7 +17,7 @@ fn lsh_split_line(line: &str) -> Vec<&str> {
 }
 
 fn lsh_num_builtins() -> usize {
-    ["cd", "help", "exit", "ls"].len()
+    ["cd", "help", "exit", "ls", "mkdir", "cp"].len()
 }
 
 fn lsh_cd(args: &[&str]) -> i32 {
@@ -60,18 +61,74 @@ fn lsh_ls(_: &[&str]) -> i32 {
     1
 }
 
+fn lsh_mkdir(args: &[&str]) {
+    if args.len() > 1 {
+        println!("More number of arguments than expected.");
+    } else if agrs.len() < 1 {
+        println!("Directory name not found.");
+    } else {
+        let status = fs::create_dir(&str).status();
+        match status {
+            Ok(exit_status) => {
+                if exit_status.success() {
+                    println!("Directory created Successfully");
+                } else {
+                    eprintln!(
+                        "mkdir command failed with exit code : {:?}",
+                        exit_status.code()
+                    );
+                }
+            }
+            Err(err) => {
+                eprintln!("Error executing mkdir commmand:{}", err);
+            }
+        }
+    }
+    fs::create_dir(&str);
+}
+
+fn lsh_cat(file_path: &[&str]) {
+    let path = Path::new(*file_path);
+
+    if !path.exists() {
+        eprintln!("Error: File '{}' does not exist.", file_path);
+        return;
+    }
+    let contents = match fs::read_to_string(path) {
+        Ok(contents) => contents,
+        Err(error) => {
+            match error.kind() {
+                io::ErrorKind::PermissionDenied => {
+                    eprintln!("Error: Permission denied to read file '{}'.", file_path);
+                }
+                _ => {
+                    eprintln!(
+                        "An unexpected error occurred while reading file '{}': {}",
+                        file_path, error
+                    );
+                }
+            }
+            return;
+        }
+    };
+
+    println!("{}", contents);
+}
+
 fn lsh_execute(args: Vec<&str>) -> i32 {
     if args.is_empty() {
         return 1;
     }
 
     for i in 0..lsh_num_builtins() {
-        if args[0] == ["cd", "help", "exit", "ls"][i] {
+        if args[0] == ["cd", "help", "exit", "ls", "cat", "mkdir"][i] {
             return match i {
                 0 => lsh_cd(&args),
                 1 => lsh_help(&args),
                 2 => lsh_exit(&args),
                 3 => lsh_ls(&args),
+                4 => lsh_cat(&args),
+                5 => lsh_mkdir(&args),
                 _ => 1,
             };
         }
