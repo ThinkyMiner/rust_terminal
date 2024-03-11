@@ -1,5 +1,6 @@
 use std::fs::{self, File};
 use std::io::{self, Write};
+use std::path::Path;
 use std::process::Command;
 
 const LSH_RL_BUFSIZE: usize = 1024;
@@ -17,7 +18,7 @@ fn lsh_split_line(line: &str) -> Vec<&str> {
 }
 
 fn lsh_num_builtins() -> usize {
-    ["cd", "help", "exit", "ls", "mkdir", "cp"].len()
+    ["cd", "help", "exit", "ls", "mkdir", "cp", "touch", "cat"].len()
 }
 
 fn lsh_cd(args: &[&str]) -> i32 {
@@ -61,67 +62,116 @@ fn lsh_ls(_: &[&str]) -> i32 {
     1
 }
 
-fn lsh_mkdir(args: &[&str]) {
-    if args.len() > 1 {
-        println!("More number of arguments than expected.");
-    } else if agrs.len() < 1 {
+
+fn lsh_mkdir(arguments: &[&str]) -> i32 {
+    if arguments.len() > 1 {
+        println!("Too many arguments.");
+    } else if arguments.len() < 1 {
         println!("Directory name not found.");
     } else {
-        let status = fs::create_dir(&str).status();
-        match status {
-            Ok(exit_status) => {
-                if exit_status.success() {
-                    println!("Directory created Successfully");
-                } else {
-                    eprintln!(
-                        "mkdir command failed with exit code : {:?}",
-                        exit_status.code()
-                    );
-                }
-            }
+        let dir_name = arguments[0];
+        
+        match fs::create_dir(dir_name) {
+            Ok(_) => println!("Directory created successfully"),
             Err(err) => {
-                eprintln!("Error executing mkdir commmand:{}", err);
+                eprintln!("Error executing mkdir command: {}", err);
             }
         }
     }
-    fs::create_dir(&str);
+    1
 }
 
-fn lsh_cat(file_path: &[&str]) {
-    let path = Path::new(*file_path);
+
+fn lsh_cat(file_path: &[&str]) -> i32 {
+    let path = Path::new(file_path[1]);
 
     if !path.exists() {
-        eprintln!("Error: File '{}' does not exist.", file_path);
-        return;
+        eprintln!("Error: File '{}' does not exist.", file_path[0]);
+        return 1;
     }
     let contents = match fs::read_to_string(path) {
         Ok(contents) => contents,
         Err(error) => {
             match error.kind() {
                 io::ErrorKind::PermissionDenied => {
-                    eprintln!("Error: Permission denied to read file '{}'.", file_path);
+                    eprintln!("Error: Permission denied to read file '{}'.", file_path[0]);
                 }
                 _ => {
                     eprintln!(
                         "An unexpected error occurred while reading file '{}': {}",
-                        file_path, error
+                        file_path[0], error
                     );
                 }
             }
-            return;
+            return 1;
         }
     };
 
     println!("{}", contents);
+    1
 }
+
+fn lsh_cp(arguments: &[&str]) -> i32 {
+    if arguments.len() != 3 {
+        println!("Usage: cp <source_file> <destination_file>");
+        return 1;
+    }
+
+    let source_path = arguments[1];
+    let destination_path = arguments[2];
+
+    let source_contents = match fs::read_to_string(source_path) {
+        Ok(contents) => contents,
+        Err(err) => {
+            eprintln!("Error reading source file '{}': {}", source_path, err);
+            return 1;
+        }
+    };
+
+    match fs::write(destination_path, source_contents) {
+        Ok(_) => 0,
+        Err(err) => {
+            eprintln!("Error writing to destination file '{}': {}", destination_path, err);
+            1
+        }
+    }
+}
+
+fn lsh_touch(file_path: &[&str]) -> i32 {
+    if file_path.len() < 2 {
+        eprintln!("Too few arguments");
+        return 1;
+    }
+    else if file_path.len() > 2 {
+        eprintln!("Too many arguments");
+        return 1;
+    }
+    else{
+        let file_result = File::create(file_path[1]);
+
+        match file_result {
+            Ok(_) => {
+                println!("File created successfully: {}", file_path[1]);
+                1
+            }
+            Err(err) => {
+                eprintln!("Error creating file '{}': {}", file_path[0], err);
+                1
+            }
+        }
+    }
+}
+
 
 fn lsh_execute(args: Vec<&str>) -> i32 {
     if args.is_empty() {
         return 1;
     }
 
+    let builtins = ["cd", "help", "exit", "ls", "cat", "mkdir", "cp", "touch"];
+
     for i in 0..lsh_num_builtins() {
-        if args[0] == ["cd", "help", "exit", "ls", "cat", "mkdir"][i] {
+        if args[0] == builtins[i] {
             return match i {
                 0 => lsh_cd(&args),
                 1 => lsh_help(&args),
@@ -129,6 +179,8 @@ fn lsh_execute(args: Vec<&str>) -> i32 {
                 3 => lsh_ls(&args),
                 4 => lsh_cat(&args),
                 5 => lsh_mkdir(&args),
+                6 => lsh_cp(&args),
+                7 => lsh_touch(&args),
                 _ => 1,
             };
         }
