@@ -1,3 +1,4 @@
+use std::env;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
@@ -18,7 +19,10 @@ fn lsh_split_line(line: &str) -> Vec<&str> {
 }
 
 fn lsh_num_builtins() -> usize {
-    ["cd", "help", "exit", "ls", "mkdir", "cp", "touch", "cat"].len()
+    [
+        "cd", "help", "exit", "ls", "mkdir", "cp", "touch", "cat", "pwd",
+    ]
+    .len()
 }
 
 fn lsh_cd(args: &[&str]) -> i32 {
@@ -34,10 +38,16 @@ fn lsh_help(_: &[&str]) -> i32 {
     println!("Rust Shell");
     println!("Enter program names and arguments, and press enter.");
     println!("Built-in commands:");
-    println!("  cd <directory>: Change the current working directory");
-    println!("  help: Display this help message");
-    println!("  exit: Exit the shell");
-    println!("  ls: List files and directories");
+    println!("  cd <directory>: Change the current working directory.");
+    println!("  help: Display this help message.");
+    println!("  exit: Exit the shell.");
+    println!("  ls: List files and directories.");
+    println!("  cat <fileName>: See the contents of file name mentioned.");
+    println!("  mkdir <newDirectoryName>: Make an empty directory.");
+    println!("  cp <sourceFile> <destinationFile>: Copy files and directories.");
+    println!("  touch <newFileName>: Create an empty file.");
+    println!("  pwd: Prints the present working directory");
+
     1
 }
 
@@ -62,7 +72,6 @@ fn lsh_ls(_: &[&str]) -> i32 {
     1
 }
 
-
 fn lsh_mkdir(arguments: &[&str]) -> i32 {
     if arguments.len() > 1 {
         println!("Too many arguments.");
@@ -70,7 +79,7 @@ fn lsh_mkdir(arguments: &[&str]) -> i32 {
         println!("Directory name not found.");
     } else {
         let dir_name = arguments[0];
-        
+
         match fs::create_dir(dir_name) {
             Ok(_) => println!("Directory created successfully"),
             Err(err) => {
@@ -80,7 +89,6 @@ fn lsh_mkdir(arguments: &[&str]) -> i32 {
     }
     1
 }
-
 
 fn lsh_cat(file_path: &[&str]) -> i32 {
     let path = Path::new(file_path[1]);
@@ -131,7 +139,10 @@ fn lsh_cp(arguments: &[&str]) -> i32 {
     match fs::write(destination_path, source_contents) {
         Ok(_) => 0,
         Err(err) => {
-            eprintln!("Error writing to destination file '{}': {}", destination_path, err);
+            eprintln!(
+                "Error writing to destination file '{}': {}",
+                destination_path, err
+            );
             1
         }
     }
@@ -141,12 +152,10 @@ fn lsh_touch(file_path: &[&str]) -> i32 {
     if file_path.len() < 2 {
         eprintln!("Too few arguments");
         return 1;
-    }
-    else if file_path.len() > 2 {
+    } else if file_path.len() > 2 {
         eprintln!("Too many arguments");
         return 1;
-    }
-    else{
+    } else {
         let file_result = File::create(file_path[1]);
 
         match file_result {
@@ -162,13 +171,34 @@ fn lsh_touch(file_path: &[&str]) -> i32 {
     }
 }
 
+fn lsh_pwd() -> i32 {
+    match env::current_dir() {
+        Ok(current_dir) => {
+            if let Some(path_str) = current_dir.to_str() {
+                println!("Current directory: {}", path_str);
+            } else {
+                eprintln!("Error converting current directory to string.");
+            }
+        }
+        Err(error) => {
+            eprintln!("Error getting current directory: {}", error);
+            return 1;
+        }
+    }
+    1
+}
 
+// 23 24 25
+// 26 27 28
+// 29 30 31
 fn lsh_execute(args: Vec<&str>) -> i32 {
     if args.is_empty() {
         return 1;
     }
 
-    let builtins = ["cd", "help", "exit", "ls", "cat", "mkdir", "cp", "touch"];
+    let builtins = [
+        "cd", "help", "exit", "ls", "cat", "mkdir", "cp", "touch", "pwd",
+    ];
 
     for i in 0..lsh_num_builtins() {
         if args[0] == builtins[i] {
@@ -181,6 +211,7 @@ fn lsh_execute(args: Vec<&str>) -> i32 {
                 5 => lsh_mkdir(&args),
                 6 => lsh_cp(&args),
                 7 => lsh_touch(&args),
+                8 => lsh_pwd(),
                 _ => 1,
             };
         }
